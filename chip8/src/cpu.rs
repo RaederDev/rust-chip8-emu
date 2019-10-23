@@ -68,9 +68,11 @@ pub struct CPU {
 
 impl CPU {
     pub fn new(memory: Memory) -> CPU {
-        CPU {
+        let mut cpu = CPU {
             memory
-        }
+        };
+
+        cpu
     }
 
 //    pub fn exec(&self, instr: Instructions) {
