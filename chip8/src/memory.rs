@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter, Error};
 
-const MEM_SIZE: usize = 4096;
-const PROGRAM_LOAD_OFFSET: usize = 0x200;
+pub const MEM_SIZE: usize = 4096;
+pub const PROGRAM_LOAD_OFFSET: usize = 0x200;
 const SPRITES: [[u8; 5]; 16] = [
     [0xF0, 0x90, 0x90, 0x90, 0xF0], //0
     [0x20, 0x60, 0x20, 0x20, 0x70], //1
@@ -22,7 +22,7 @@ const SPRITES: [[u8; 5]; 16] = [
 ];
 
 pub struct Memory {
-    memory: [u8; MEM_SIZE]
+    pub memory: [u8; MEM_SIZE]
 }
 
 impl Memory {

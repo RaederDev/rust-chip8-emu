@@ -8,9 +8,10 @@ fn main() {
     let mut cpu = CPU::new(mem);
     let path = get_file_path(&"./div.ch8".to_string()).unwrap();
     let file_bytes = read_file(&path);
-    println!("{}", file_bytes.len());
     cpu.memory.load_program(&file_bytes);
-    println!("{}", cpu.memory);
+    cpu.step();
+    cpu.step();
+    cpu.step();
 }
 
 fn read_file(path: &PathBuf) -> Vec<u8> {
