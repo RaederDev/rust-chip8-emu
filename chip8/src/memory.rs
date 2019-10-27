@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Error};
+use std::fmt::{Display, Formatter, Error, Debug};
 
 pub const MEM_SIZE: usize = 4096;
 pub const PROGRAM_LOAD_OFFSET: usize = 0x200;
@@ -43,7 +43,7 @@ impl Memory {
     }
 }
 
-impl Display for Memory {
+impl Debug for Memory {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         for (i, value) in self.memory.iter().enumerate() {
             write!(f, "0x{:X} ", value)?;
