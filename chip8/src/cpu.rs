@@ -1,28 +1,18 @@
 use crate::memory::{Memory, PROGRAM_LOAD_OFFSET};
 use crate::instructions::Instruction;
+use std::num::Wrapping;
 
 #[derive(Debug)]
 pub struct Registers {
-    v0: u8,
-    v1: u8,
-    v2: u8,
-    v3: u8,
-    v4: u8,
-    v5: u8,
-    v6: u8,
-    v7: u8,
-    v8: u8,
-    v9: u8,
-    va: u8,
-    vb: u8,
-    vc: u8,
-    vd: u8,
-    ve: u8,
-    vf: u8,
-    dt: u8, //timer
-    i: u16, //index
-    pc: u16, //program counter
-    sp: usize, //stack pointer
+    prg_regs: [u8; 16],
+    //timer
+    dt: u8,
+    //index
+    i: u16,
+    //program counter
+    pc: u16,
+    //stack pointer
+    sp: usize,
 }
 
 #[derive(Debug)]
@@ -34,34 +24,17 @@ pub struct CPU {
 
 impl CPU {
     pub fn new(memory: Memory) -> CPU {
-        let mut cpu = CPU {
+        CPU {
             memory,
             stack: [0x0; 16],
             registers: Registers {
-                v0: 0x0,
-                v1: 0x0,
-                v2: 0x0,
-                v3: 0x0,
-                v4: 0x0,
-                v5: 0x0,
-                v6: 0x0,
-                v7: 0x0,
-                v8: 0x0,
-                v9: 0x0,
-                va: 0x0,
-                vb: 0x0,
-                vc: 0x0,
-                vd: 0x0,
-                ve: 0x0,
-                vf: 0x0,
+                prg_regs: [0x0; 16],
                 dt: 0x0,
                 i: 0x0,
                 pc: PROGRAM_LOAD_OFFSET as u16,
                 sp: 0x0,
             },
-        };
-
-        cpu
+        }
     }
 
     pub fn fetch_current_instruction(&self) -> u32 {
@@ -74,47 +47,19 @@ impl CPU {
     }
 
     pub fn write_register(&mut self, register: u32, value: u8) {
-        match register {
-            0x00 => self.registers.v0 = value,
-            0x01 => self.registers.v1 = value,
-            0x02 => self.registers.v2 = value,
-            0x03 => self.registers.v3 = value,
-            0x04 => self.registers.v4 = value,
-            0x05 => self.registers.v5 = value,
-            0x06 => self.registers.v6 = value,
-            0x07 => self.registers.v7 = value,
-            0x08 => self.registers.v8 = value,
-            0x09 => self.registers.v9 = value,
-            0x0a => self.registers.va = value,
-            0x0b => self.registers.vb = value,
-            0x0c => self.registers.vc = value,
-            0x0d => self.registers.vd = value,
-            0x0e => self.registers.ve = value,
-            0x0f => self.registers.vf = value,
-            _ => panic!("Invalid register accessed"),
-        }
+        self.registers.prg_regs[register as usize] = value;
     }
 
     pub fn read_register(&self, register: u32) -> u8 {
-        match register {
-            0x00 => self.registers.v0,
-            0x01 => self.registers.v1,
-            0x02 => self.registers.v2,
-            0x03 => self.registers.v3,
-            0x04 => self.registers.v4,
-            0x05 => self.registers.v5,
-            0x06 => self.registers.v6,
-            0x07 => self.registers.v7,
-            0x08 => self.registers.v8,
-            0x09 => self.registers.v9,
-            0x0a => self.registers.va,
-            0x0b => self.registers.vb,
-            0x0c => self.registers.vc,
-            0x0d => self.registers.vd,
-            0x0e => self.registers.ve,
-            0x0f => self.registers.vf,
-            _ => panic!("Invalid register accessed"),
-        }
+        self.registers.prg_regs[register as usize]
+    }
+
+    pub fn get_x_reg(value: u32) -> u32 {
+        value >> 8 & 0x000F
+    }
+
+    pub fn get_y_reg(value: u32) -> u32 {
+        value >> 4 & 0x000F
     }
 
     pub fn step(&mut self) {
@@ -124,65 +69,95 @@ impl CPU {
         match instr {
             Instruction::SYS => {
                 panic!("machine code execution not supported");
-            },
+            }
             Instruction::CLS => {
                 println!("Clear screen");
-            },
+            }
             Instruction::RET => {
                 self.registers.sp -= 1;
                 self.registers.pc = self.stack[self.registers.sp];
-            },
+            }
             Instruction::JP => {
                 self.registers.pc = (value & 0x0FFF) as u16;
-            },
+            }
             Instruction::CALL => {
                 self.stack[self.registers.sp] = self.registers.pc;
                 self.registers.sp += 1;
                 self.registers.pc = (value & 0x0FFF) as u16;
-            },
+            }
             Instruction::SE_VX_BT => {
-                let content = self.read_register(value >> 8 & 0x000F);
+                let content = self.read_register(CPU::get_x_reg(value));
                 if content == (value & 0x00FF) as u8 {
                     self.registers.pc += 2;
                 }
-            },
+            }
             Instruction::SNE_VX_BT => {
-                let content = self.read_register(value >> 8 & 0x000F);
+                let content = self.read_register(CPU::get_x_reg(value));
                 if content != (value & 0x00FF) as u8 {
                     self.registers.pc += 2;
                 }
-            },
+            }
             Instruction::SE_VX_VY => {
-                let content_x = self.read_register(value >> 8 & 0x000F);
-                let content_y = self.read_register(value >> 4 & 0x000F);
+                let content_x = self.read_register(CPU::get_x_reg(value));
+                let content_y = self.read_register(CPU::get_y_reg(value));
                 if content_x == content_y {
                     self.registers.pc += 2;
                 }
-            },
+            }
             Instruction::LD_VX_BT => {
-                self.write_register(value >> 8 & 0x000F, (value & 0x00FF) as u8);
-            },
+                self.write_register(CPU::get_x_reg(value), (value & 0x00FF) as u8);
+            }
             Instruction::ADD_VX_BT => {
-                let register = value >> 8 & 0x000F;
+                let register = CPU::get_x_reg(value);
                 let to_add = (value & 0x00FF) as u8;
                 self.write_register(register, self.read_register(register) as u8 + to_add);
-            },
+            }
             Instruction::LD_VX_VY => {
-                let content_y = self.read_register(value >> 4 & 0x000F);
-                self.write_register(value >> 8 & 0x000F, content_y);
-            },
+                let content_y = self.read_register(CPU::get_y_reg(value));
+                self.write_register(CPU::get_x_reg(value), content_y);
+            }
             Instruction::OR_VX_VY => {
-                let register_x = value >> 8 & 0x000F;
+                let register_x = CPU::get_x_reg(value);
                 let content_x = self.read_register(register_x);
-                let content_y = self.read_register(value >> 4 & 0x000F);
+                let content_y = self.read_register(CPU::get_y_reg(value));
                 self.write_register(register_x, content_x | content_y);
-            },
+            }
             Instruction::AND_VX_VY => {
-                let register_x = value >> 8 & 0x000F;
+                let register_x = CPU::get_x_reg(value);
                 let content_x = self.read_register(register_x);
-                let content_y = self.read_register(value >> 4 & 0x000F);
+                let content_y = self.read_register(CPU::get_y_reg(value));
                 self.write_register(register_x, content_x & content_y);
-            },
+            }
+            Instruction::XOR_VX_VY => {
+                let register_x = CPU::get_x_reg(value);
+                let content_x = self.read_register(register_x);
+                let content_y = self.read_register(CPU::get_y_reg(value));
+                self.write_register(register_x, content_x ^ content_y);
+            }
+            Instruction::ADD_VX_VY => {
+                let register_x = CPU::get_x_reg(value);
+                let content_x = self.read_register(register_x);
+                let content_y = self.read_register(CPU::get_y_reg(value));
+                let result: u16 = content_x as u16 + content_y as u16;
+                if result > 255 {
+                    self.registers.prg_regs[0xF] = 1;
+                } else {
+                    self.registers.prg_regs[0xF] = 0;
+                }
+                self.write_register(register_x, (result & 0x000000FF) as u8);
+            }
+            Instruction::SUB_VX_VY => {
+                let register_x = CPU::get_x_reg(value);
+                let content_x = self.read_register(register_x);
+                let content_y = self.read_register(CPU::get_y_reg(value));
+                let result = Wrapping(content_x) - Wrapping(content_y);
+                if content_x > content_y {
+                    self.registers.prg_regs[0xF] = 1;
+                } else {
+                    self.registers.prg_regs[0xF] = 0;
+                }
+                self.write_register(register_x, result.0);
+            }
             _ => {
                 println!("not implemented");
             }
@@ -255,9 +230,9 @@ mod tests {
             0x12, //0x20E
             0x00, //0x20F
         ]);
-        cpu.registers.vb = 0x22;
-        cpu.registers.vd = 0x11;
-        cpu.registers.ve = 0x11;
+        cpu.registers.prg_regs[0xB] = 0x22;
+        cpu.registers.prg_regs[0xD] = 0x11;
+        cpu.registers.prg_regs[0xE] = 0x11;
         cpu.step();
         assert_eq!(0x204, cpu.registers.pc);
         cpu.step();
@@ -290,18 +265,19 @@ mod tests {
         ]);
 
         cpu.step();
-        assert_eq!(0xFF, cpu.registers.va);
+        assert_eq!(0xFF, cpu.registers.prg_regs[0xA]);
         cpu.step();
-        assert_eq!(0xAF, cpu.registers.va);
+        assert_eq!(0xAF, cpu.registers.prg_regs[0xA]);
         cpu.step();
-        assert_eq!(0xB0, cpu.registers.va);
-        assert_ne!(0xB0, cpu.registers.vb);
+        assert_eq!(0xB0, cpu.registers.prg_regs[0xA]);
+        assert_ne!(0xB0, cpu.registers.prg_regs[0xB]);
         cpu.step();
-        assert_eq!(0xB0, cpu.registers.vb);
+        assert_eq!(0xB0, cpu.registers.prg_regs[0xB]);
     }
 
     #[test]
     fn test_math() {
+        //xor, add, sub
         let mut cpu = prepare_cpu(vec![
             // OR A, B
             0x8A, //0x200
@@ -312,15 +288,52 @@ mod tests {
             // AND A, B
             0x8A, //0x202
             0xB2, //0x203
+            // XOR A, C
+            0x8A, //0x204
+            0xC3, //0x205
+            // ADD D, E
+            0x8D, //0x206
+            0xE4, //0x207
+            // ADD D, E
+            0x8D, //0x208
+            0xE4, //0x209
+            // LD D, 0xFF
+            0x6D, //0x20A
+            0xFF, //0x20B
+            // SUB D, E
+            0x8D, //0x20C
+            0xE5, //0x20D
+            // SUB 0, 1
+            0x80, //0x20E
+            0x15, //0x20F
         ]);
-        cpu.registers.va = 0x02;
-        cpu.registers.vb = 0xA1;
+        cpu.registers.prg_regs[0x0] = 0x01;
+        cpu.registers.prg_regs[0x1] = 0x03;
+        cpu.registers.prg_regs[0xA] = 0x02;
+        cpu.registers.prg_regs[0xB] = 0xA1;
+        cpu.registers.prg_regs[0xC] = 0x02;
+        cpu.registers.prg_regs[0xD] = 0xFE;
+        cpu.registers.prg_regs[0xE] = 0x01;
 
         cpu.step();
-        assert_eq!(0xA3, cpu.registers.va);
+        assert_eq!(0xA3, cpu.registers.prg_regs[0xA]);
         cpu.step();
         cpu.step();
-        assert_eq!(0xA0, cpu.registers.va);
+        assert_eq!(0xA0, cpu.registers.prg_regs[0xA]);
+        cpu.step();
+        assert_eq!(0xA2, cpu.registers.prg_regs[0xA]);
+        cpu.step();
+        assert_eq!(0xFF, cpu.registers.prg_regs[0xD]);
+        assert_eq!(0x0, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0x00, cpu.registers.prg_regs[0xD]);
+        assert_eq!(0x1, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        cpu.step();
+        assert_eq!(0xFE, cpu.registers.prg_regs[0xD]);
+        assert_eq!(0x01, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0xFE, cpu.registers.prg_regs[0x0]);
+        assert_eq!(0x00, cpu.registers.prg_regs[0xF]);
     }
-
 }
