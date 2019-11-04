@@ -158,6 +158,44 @@ impl CPU {
                 }
                 self.write_register(register_x, result.0);
             }
+            Instruction::SHR_VX_VY => {
+                let register_x = CPU::get_x_reg(value);
+                let content_x = self.read_register(register_x);
+                self.registers.prg_regs[0xF] = content_x % 2;
+                self.write_register(register_x, content_x / 2);
+            }
+            Instruction::SUBN_VX_VY => {
+                let register_x = CPU::get_x_reg(value);
+                let content_x = self.read_register(register_x);
+                let content_y = self.read_register(CPU::get_y_reg(value));
+                let result = Wrapping(content_y) - Wrapping(content_x);
+                if content_y > content_x {
+                    self.registers.prg_regs[0xF] = 1;
+                } else {
+                    self.registers.prg_regs[0xF] = 0;
+                }
+                self.write_register(register_x, result.0);
+            }
+            Instruction::SHL_VX_VY => {
+                let register_x = CPU::get_x_reg(value);
+                let content_x = self.read_register(register_x);
+                if content_x >= 0x80 { //msb = 1
+                    self.registers.prg_regs[0xF] = 1;
+                } else {
+                    self.registers.prg_regs[0xF] = 0;
+                }
+                self.write_register(
+                    register_x,
+                    (Wrapping(content_x) + Wrapping(content_x)).0
+                );
+            }
+            Instruction::SNE_VX_VY => {
+                let content_x = self.read_register(CPU::get_x_reg(value));
+                let content_y = self.read_register(CPU::get_y_reg(value));
+                if content_x != content_y {
+                    self.registers.pc += 2;
+                }
+            }
             _ => {
                 println!("not implemented");
             }
@@ -226,9 +264,15 @@ mod tests {
             // SE VB, VD -> should not skip
             0x5B, //0x20C
             0xD0, //0x20D
+            // SNE VB, VD -> skip
+            0x9B, //0x20E
+            0xD0, //0x20F
+            // INVALID
+            0x00, //0x210
+            0x00, //0x211
             // JP 0x200
-            0x12, //0x20E
-            0x00, //0x20F
+            0x12, //0x212
+            0x00, //0x213
         ]);
         cpu.registers.prg_regs[0xB] = 0x22;
         cpu.registers.prg_regs[0xD] = 0x11;
@@ -243,6 +287,8 @@ mod tests {
         assert_eq!(0x20C, cpu.registers.pc);
         cpu.step();
         assert_eq!(0x20E, cpu.registers.pc);
+        cpu.step();
+        assert_eq!(0x212, cpu.registers.pc);
         cpu.step();
         assert_eq!(0x200, cpu.registers.pc);
     }
@@ -335,5 +381,53 @@ mod tests {
         cpu.step();
         assert_eq!(0xFE, cpu.registers.prg_regs[0x0]);
         assert_eq!(0x00, cpu.registers.prg_regs[0xF]);
+    }
+
+    #[test]
+    fn test_additional_math() {
+        //xor, add, sub
+        let mut cpu = prepare_cpu(vec![
+            // SHR A, {_}
+            0x8A, //0x200
+            0xB6, //0x201
+            // SHR A, {_}
+            0x8A, //0x202
+            0xB6, //0x203
+            // SUBN A, B
+            0x8A, //0x204
+            0xB7, //0x205
+            // SUBN B, A
+            0x8B, //0x206
+            0xA7, //0x207
+            // SHL C, {_}
+            0x8C, //0x206
+            0xAE, //0x207
+            // SHL D, {_}
+            0x8D, //0x208
+            0xAE, //0x209
+        ]);
+        cpu.registers.prg_regs[0xA] = 0x0A;
+        cpu.registers.prg_regs[0xB] = 0x01;
+        cpu.registers.prg_regs[0xC] = 0x05;
+        cpu.registers.prg_regs[0xD] = 0xA0;
+
+        cpu.step();
+        assert_eq!(0x05, cpu.registers.prg_regs[0xA]);
+        assert_eq!(0x00, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0x02, cpu.registers.prg_regs[0xA]);
+        assert_eq!(0x01, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0xFF, cpu.registers.prg_regs[0xA]);
+        assert_eq!(0x00, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0xFE, cpu.registers.prg_regs[0xB]);
+        assert_eq!(0x01, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0x0A, cpu.registers.prg_regs[0xC]);
+        assert_eq!(0x00, cpu.registers.prg_regs[0xF]);
+        cpu.step();
+        assert_eq!(0x40, cpu.registers.prg_regs[0xD]);
+        assert_eq!(0x01, cpu.registers.prg_regs[0xF]);
     }
 }
