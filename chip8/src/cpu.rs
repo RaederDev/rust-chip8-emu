@@ -1,6 +1,7 @@
 use crate::memory::{Memory, PROGRAM_LOAD_OFFSET};
 use crate::instructions::Instruction;
 use std::num::Wrapping;
+use rand::{thread_rng, Rng};
 
 #[derive(Debug)]
 pub struct Registers {
@@ -196,6 +197,16 @@ impl CPU {
                     self.registers.pc += 2;
                 }
             }
+            Instruction::LD_I_ADDR => {
+                self.registers.i = (value & 0x0FFF) as u16;
+            }
+            Instruction::JP_V0_ADDR => {
+                let addr = Wrapping((value & 0x0FFF) as u16);
+                self.registers.pc = (addr + Wrapping(self.registers.prg_regs[0] as u16)).0;
+            }
+            Instruction::RND_VX_BT => {
+                let a = thread_rng().gen_range(0x00, 0x100) as u8;
+            }
             _ => {
                 println!("not implemented");
             }
@@ -308,6 +319,15 @@ mod tests {
             // LD B, A
             0x8B, //0x207
             0xA0, //0x208
+            // LD, I, 0x3AB
+            0xA3, //0x209
+            0xAB, //0x20A
+            // LD 0, 0x10
+            0x60, //0x20B
+            0x10, //0x20C
+            // JP V0, 0x1F0
+            0xB1, //0x20D
+            0xF0, //0x20E
         ]);
 
         cpu.step();
@@ -319,6 +339,12 @@ mod tests {
         assert_ne!(0xB0, cpu.registers.prg_regs[0xB]);
         cpu.step();
         assert_eq!(0xB0, cpu.registers.prg_regs[0xB]);
+        cpu.step();
+        assert_eq!(0x3AB, cpu.registers.i);
+        cpu.step();
+        assert_eq!(0x10, cpu.registers.prg_regs[0x0]);
+        cpu.step();
+        assert_eq!(0x200, cpu.registers.pc);
     }
 
     #[test]
