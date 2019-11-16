@@ -205,7 +205,9 @@ impl CPU {
                 self.registers.pc = (addr + Wrapping(self.registers.prg_regs[0] as u16)).0;
             }
             Instruction::RND_VX_BT => {
-                let a = thread_rng().gen_range(0x00, 0x100) as u8;
+                let reg_x = CPU::get_x_reg(value);
+                let rnd = thread_rng().gen_range(0x00, 0x100) as u8;
+                self.write_register(reg_x, rnd & ((value & 0x00FF) as u8))
             }
             _ => {
                 println!("not implemented");
